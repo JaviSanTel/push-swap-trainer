@@ -1,0 +1,1329 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Push Swap Trainer — 42</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Courier New', monospace;
+      background: #0d1117;
+      color: #e6edf3;
+      min-height: 100vh;
+      padding: 16px;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 1.4rem;
+      color: #58a6ff;
+      margin-bottom: 16px;
+      letter-spacing: 3px;
+    }
+
+    /* ── Controls ── */
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+      background: #161b22;
+      padding: 12px 16px;
+      border-radius: 8px;
+      border: 1px solid #30363d;
+      flex-wrap: wrap;
+    }
+    .controls label { color: #8b949e; font-size: 0.82rem; }
+    .controls input[type="range"] { width: 160px; accent-color: #58a6ff; cursor: pointer; }
+    .controls input[type="number"] {
+      width: 64px;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      color: #e6edf3;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 0.85rem;
+    }
+    .btn {
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 0.82rem;
+      border: 1px solid #30363d;
+      transition: background 0.12s;
+    }
+    .btn-green  { background: #238636; color: #fff; border-color: #2ea043; }
+    .btn-green:hover  { background: #2ea043; }
+    .btn-gray   { background: #21262d; color: #e6edf3; }
+    .btn-gray:hover   { background: #30363d; }
+    .btn-red    { background: #6e1f1f; color: #ffa0a0; border-color: #f8514955; }
+    .btn-red:hover    { background: #da363344; }
+
+    /* ── Main 3-column grid ── */
+    .main {
+      display: grid;
+      grid-template-columns: 1fr 1fr 190px;
+      gap: 12px;
+      align-items: start;
+    }
+
+    /* ── Stacks ── */
+    .stack-wrap {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 10px;
+    }
+    .stack-title {
+      text-align: center;
+      font-size: 1rem;
+      font-weight: bold;
+      margin-bottom: 10px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #30363d;
+      transition: color 0.2s;
+    }
+    .stack-title.s-unsorted { color: #58a6ff; }
+    .stack-title.s-sorted   { color: #3fb950; }
+    .stack-title.s-empty    { color: #6e7681; }
+
+    .stack-list {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      max-height: 520px;
+      overflow-y: auto;
+    }
+
+    /* Big mode (N ≤ 25): colored boxes with number */
+    .item-big {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      font-weight: bold;
+      height: 28px;
+      transition: outline 0.05s;
+      user-select: none;
+    }
+    .item-big.is-top { outline: 2px solid rgba(255,255,255,0.55); }
+
+    /* Bar mode (N > 25): value label + colored bar */
+    .item-bar {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      height: 14px;
+    }
+    .item-bar .lbl {
+      font-size: 0.65rem;
+      color: #6e7681;
+      width: 32px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+    .item-bar .bar {
+      height: 10px;
+      border-radius: 2px;
+      min-width: 3px;
+    }
+    .item-bar.is-top .bar { outline: 1px solid rgba(255,255,255,0.5); }
+
+    .stack-empty-msg {
+      text-align: center;
+      color: #6e7681;
+      font-size: 0.8rem;
+      padding: 24px 0;
+    }
+
+    /* ── Operations panel ── */
+    .ops-panel {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 10px;
+    }
+    .ops-panel h3 {
+      text-align: center;
+      font-size: 0.8rem;
+      color: #8b949e;
+      margin-bottom: 10px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .ops-group { margin-bottom: 10px; }
+    .ops-group-lbl {
+      font-size: 0.65rem;
+      color: #6e7681;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+    }
+    .ops-btns { display: flex; flex-direction: column; gap: 3px; }
+
+    .op-btn {
+      width: 100%;
+      text-align: left;
+      padding: 6px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: 'Courier New', monospace;
+      border: 1px solid transparent;
+      transition: transform 0.07s, background 0.1s;
+      line-height: 1;
+    }
+    .op-btn:active { transform: scale(0.97); }
+    .op-btn .on  { font-size: 0.9rem; font-weight: bold; display: block; }
+    .op-btn .od  { font-size: 0.6rem; color: #6e7681; display: block; margin-top: 1px; }
+    .op-btn .ok  { font-size: 0.55rem; color: #444d56; display: block; margin-top: 1px; }
+
+    .op-swap  { background: #1a2840; color: #79c0ff; border-color: #1f3a5f; }
+    .op-swap:hover  { background: #1f3a5f; }
+    .op-push  { background: #1a2b1a; color: #56d364; border-color: #1f3d1f; }
+    .op-push:hover  { background: #1f3d1f; }
+    .op-rot   { background: #2a1a3a; color: #d2a8ff; border-color: #3a1f5a; }
+    .op-rot:hover   { background: #3a1f5a; }
+    .op-rrot  { background: #2d1f10; color: #ffa657; border-color: #4a2d10; }
+    .op-rrot:hover  { background: #4a2d10; }
+
+    /* ── Bottom bar ── */
+    .bottom {
+      margin-top: 12px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+    .bottom-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+    .counter-label { font-size: 0.85rem; color: #8b949e; }
+    .counter-num {
+      font-size: 1.8rem;
+      font-weight: bold;
+      color: #f0883e;
+      line-height: 1;
+    }
+    .status-pill {
+      padding: 3px 12px;
+      border-radius: 20px;
+      font-size: 0.78rem;
+      font-weight: bold;
+      border: 1px solid;
+    }
+    .pill-no  { background: #1a2840; color: #58a6ff; border-color: #1f3a5f; }
+    .pill-yes { background: #1a2b1a; color: #3fb950; border-color: #2ea04355; }
+
+    .hist-lbl { font-size: 0.72rem; color: #6e7681; margin-bottom: 5px; }
+    .hist-box {
+      background: #0d1117;
+      border: 1px solid #21262d;
+      border-radius: 4px;
+      padding: 6px 8px;
+      min-height: 36px;
+      max-height: 90px;
+      overflow-y: auto;
+      word-break: break-all;
+    }
+    .chip {
+      display: inline-block;
+      padding: 1px 5px;
+      border-radius: 3px;
+      margin: 1px 1px;
+      font-size: 0.72rem;
+      font-weight: bold;
+    }
+    .chip-sa, .chip-sb, .chip-ss { background: #1a2840; color: #79c0ff; }
+    .chip-pa, .chip-pb            { background: #1a2b1a; color: #56d364; }
+    .chip-ra, .chip-rb, .chip-rr  { background: #2a1a3a; color: #d2a8ff; }
+    .chip-rra,.chip-rrb,.chip-rrr { background: #2d1f10; color: #ffa657; }
+
+    /* Shortcuts legend */
+    .shortcuts {
+      margin-top: 10px;
+      font-size: 0.65rem;
+      color: #444d56;
+      text-align: center;
+    }
+    .shortcuts b { color: #6e7681; }
+
+    @keyframes pop { 0%,100%{transform:scale(1)} 50%{transform:scale(1.04)} }
+    .pop { animation: pop 0.35s ease; }
+
+    /* ── Script runner ── */
+    .script-section {
+      margin-top: 12px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+    .script-top {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+    .script-title {
+      font-size: 0.82rem;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      flex: 1;
+    }
+    .example-sel {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      color: #c9d1d9;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.78rem;
+      cursor: pointer;
+    }
+    .script-api {
+      font-size: 0.68rem;
+      color: #6e7681;
+      margin-bottom: 8px;
+      padding: 5px 8px;
+      background: #0d1117;
+      border: 1px solid #21262d;
+      border-radius: 4px;
+      line-height: 1.6;
+    }
+    .script-api b { color: #79c0ff; }
+    .script-api .sop { color: #79c0ff; font-size: 0.7rem; }
+    .script-editor {
+      width: 100%;
+      background: #0d1117;
+      border: 1px solid #21262d;
+      color: #c9d1d9;
+      padding: 10px 12px;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.82rem;
+      line-height: 1.65;
+      resize: vertical;
+      min-height: 170px;
+      tab-size: 2;
+    }
+    .script-editor:focus { outline: none; border-color: #388bfd55; }
+    .script-msg {
+      min-height: 18px;
+      font-size: 0.75rem;
+      margin: 5px 0 6px;
+      padding: 0 2px;
+    }
+    .script-msg.ok  { color: #3fb950; }
+    .script-msg.err { color: #f85149; }
+    .script-msg.inf { color: #d2a8ff; }
+    .script-acts {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .script-acts .btn { font-size: 0.76rem; padding: 5px 12px; }
+    .script-acts .btn:disabled { opacity: 0.38; cursor: not-allowed; }
+
+    /* ── Macros ── */
+    .macros-section {
+      margin-top: 12px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+    .macros-top {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    .macros-title {
+      font-size: 0.82rem;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      flex: 1;
+    }
+    .anim-ctrl {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.72rem;
+      color: #6e7681;
+    }
+    .anim-ctrl input[type="range"] { width: 80px; accent-color: #d2a8ff; cursor: pointer; }
+    .macros-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+      gap: 10px;
+    }
+    .macro-card {
+      background: #0d1117;
+      border: 1px solid #21262d;
+      border-radius: 6px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      transition: border-color 0.2s;
+    }
+    .macro-card.is-animating { border-color: #d2a8ff66; }
+    .macro-hdr { display: flex; gap: 6px; align-items: center; }
+    .macro-name {
+      flex: 1;
+      background: #161b22;
+      border: 1px solid #30363d;
+      color: #e6edf3;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.8rem;
+    }
+    .macro-name:focus { outline: 1px solid #58a6ff44; border-color: #58a6ff88; }
+    .macro-del {
+      background: none;
+      border: 1px solid transparent;
+      color: #6e7681;
+      cursor: pointer;
+      font-size: 0.8rem;
+      padding: 3px 7px;
+      border-radius: 3px;
+    }
+    .macro-del:hover { background: #da363322; color: #f85149; border-color: #f8514933; }
+    .macro-seq {
+      background: #161b22;
+      border: 1px solid #21262d;
+      color: #8b949e;
+      padding: 6px 8px;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.75rem;
+      resize: vertical;
+      line-height: 1.6;
+      min-height: 72px;
+    }
+    .macro-seq:focus { outline: none; border-color: #30363d; color: #c9d1d9; }
+    .macro-info { font-size: 0.64rem; color: #6e7681; min-height: 14px; }
+    .macro-info .err { color: #f85149; }
+    .macro-progress {
+      font-size: 0.64rem;
+      color: #d2a8ff;
+      min-height: 14px;
+      font-weight: bold;
+    }
+    .macro-acts { display: flex; gap: 6px; }
+    .macro-acts .btn { flex: 1; font-size: 0.75rem; padding: 5px 4px; text-align: center; }
+    .macro-acts .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+
+<h1>⚙ PUSH SWAP TRAINER — 42</h1>
+
+<div class="controls">
+  <label>Elementos:</label>
+  <input type="range"  id="slider" min="2" max="100" value="5"
+         oninput="syncN(+this.value, false)">
+  <input type="number" id="nInput" min="2" max="500"  value="5"
+         onchange="syncN(+this.value, true)">
+  <button class="btn btn-green" onclick="initStacks()">🔀 Nuevo shuffle</button>
+  <button class="btn btn-gray"  onclick="resetToOrig()">↺ Resetear</button>
+  <button class="btn btn-red"   onclick="clearHist()">✕ Borrar historial</button>
+</div>
+
+<div class="main">
+  <!-- Stack A -->
+  <div class="stack-wrap">
+    <div class="stack-title s-unsorted" id="titleA">Stack A [5]</div>
+    <div class="stack-list" id="listA"></div>
+  </div>
+
+  <!-- Stack B -->
+  <div class="stack-wrap">
+    <div class="stack-title s-empty" id="titleB">Stack B [0]</div>
+    <div class="stack-list" id="listB"></div>
+  </div>
+
+  <!-- Operations -->
+  <div class="ops-panel">
+    <h3>Operaciones</h3>
+
+    <div class="ops-group">
+      <div class="ops-group-lbl">Swap</div>
+      <div class="ops-btns">
+        <button class="op-btn op-swap" onclick="do_sa()">
+          <span class="on">sa</span>
+          <span class="od">swap top 2 of A</span>
+          <span class="ok">key: A</span>
+        </button>
+        <button class="op-btn op-swap" onclick="do_sb()">
+          <span class="on">sb</span>
+          <span class="od">swap top 2 of B</span>
+          <span class="ok">key: B</span>
+        </button>
+        <button class="op-btn op-swap" onclick="do_ss()">
+          <span class="on">ss</span>
+          <span class="od">sa + sb</span>
+          <span class="ok">key: S</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="ops-group">
+      <div class="ops-group-lbl">Push</div>
+      <div class="ops-btns">
+        <button class="op-btn op-push" onclick="do_pa()">
+          <span class="on">pa</span>
+          <span class="od">B → top of A</span>
+          <span class="ok">key: P</span>
+        </button>
+        <button class="op-btn op-push" onclick="do_pb()">
+          <span class="on">pb</span>
+          <span class="od">A → top of B</span>
+          <span class="ok">key: O</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="ops-group">
+      <div class="ops-group-lbl">Rotate</div>
+      <div class="ops-btns">
+        <button class="op-btn op-rot" onclick="do_ra()">
+          <span class="on">ra</span>
+          <span class="od">top A → bottom</span>
+          <span class="ok">key: R</span>
+        </button>
+        <button class="op-btn op-rot" onclick="do_rb()">
+          <span class="on">rb</span>
+          <span class="od">top B → bottom</span>
+          <span class="ok">key: E</span>
+        </button>
+        <button class="op-btn op-rot" onclick="do_rr()">
+          <span class="on">rr</span>
+          <span class="od">ra + rb</span>
+          <span class="ok">key: T</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="ops-group">
+      <div class="ops-group-lbl">Rev Rotate</div>
+      <div class="ops-btns">
+        <button class="op-btn op-rrot" onclick="do_rra()">
+          <span class="on">rra</span>
+          <span class="od">bottom A → top</span>
+          <span class="ok">key: F</span>
+        </button>
+        <button class="op-btn op-rrot" onclick="do_rrb()">
+          <span class="on">rrb</span>
+          <span class="od">bottom B → top</span>
+          <span class="ok">key: D</span>
+        </button>
+        <button class="op-btn op-rrot" onclick="do_rrr()">
+          <span class="on">rrr</span>
+          <span class="od">rra + rrb</span>
+          <span class="ok">key: G</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Bottom -->
+<div class="bottom">
+  <div class="bottom-row">
+    <span class="counter-label">Movimientos:&nbsp;<span class="counter-num" id="cNum">0</span></span>
+    <span class="status-pill pill-no" id="pill">no ordenado</span>
+    <button class="btn btn-gray" style="font-size:0.75rem;padding:4px 10px"
+            onclick="copySeq()">📋 Copiar secuencia</button>
+  </div>
+  <div class="hist-lbl">Historial:</div>
+  <div class="hist-box" id="histBox">—</div>
+  <div class="shortcuts">
+    <b>Atajos:</b> A sa · B sb · S ss · P pa · O pb · R ra · E rb · T rr · F rra · D rrb · G rrr
+  </div>
+</div>
+
+<!-- Macros -->
+<div class="macros-section">
+  <div class="macros-top">
+    <span class="macros-title">⚡ Macros de algoritmos</span>
+    <div class="anim-ctrl">
+      <span>Delay:</span>
+      <input type="range" id="animSpeed" min="30" max="1000" value="250" step="20"
+             oninput="document.getElementById('animLbl').textContent=this.value+'ms'">
+      <span id="animLbl">250ms</span>
+    </div>
+    <button class="btn btn-red" id="stopBtn" onclick="stopAnim()"
+            style="display:none;font-size:0.72rem;padding:4px 10px">⏹ Stop</button>
+    <button class="btn btn-gray" style="font-size:0.72rem" onclick="addMacro()">＋ Nuevo macro</button>
+  </div>
+  <div class="macros-grid" id="macrosGrid"></div>
+</div>
+
+<!-- Script runner -->
+<div class="script-section">
+  <div class="script-top">
+    <span class="script-title">🖥 Algoritmo JS interactivo</span>
+    <select class="example-sel" id="exSel" onchange="loadExample(this.value); this.value=''">
+      <option value="">— Cargar ejemplo —</option>
+      <option value="sort3">Sort 3 elementos</option>
+      <option value="selSort">Selection sort via B</option>
+      <option value="insSort">Insertion sort via B</option>
+      <option value="bubble">Bubble sort</option>
+      <option value="radix">Radix sort (LSD bits)</option>
+      <option value="turk">Turkish sort (chunks)</option>
+      <option value="tpl">Plantilla vacía</option>
+    </select>
+  </div>
+  <div class="script-api">
+    <b>A[]</b> B[] — pilas (índice 0 = top) ·
+    <span class="sop">sa() sb() ss()</span> ·
+    <span class="sop">pa() pb()</span> ·
+    <span class="sop">ra() rb() rr()</span> ·
+    <span class="sop">rra() rrb() rrr()</span> ·
+    A.length &nbsp;B.length &nbsp;N
+  </div>
+  <textarea class="script-editor" id="scriptCode" spellcheck="false"
+            placeholder="// Escribe tu algoritmo aquí&#10;// Ejemplo mínimo:&#10;while (A.length > 1 &amp;&amp; A[0] > A[1]) sa();"></textarea>
+  <div class="script-msg" id="scriptMsg"></div>
+  <div class="script-acts">
+    <button class="btn btn-green"  onclick="execScript()">▶ Ejecutar</button>
+    <button class="btn btn-gray"   onclick="animateScript()">⏯ Animar (desde A0)</button>
+    <button class="btn btn-gray"   onclick="initStepMode()" id="prepStepBtn">⏸ Paso a paso</button>
+    <button class="btn btn-gray"   onclick="nextStep()" id="nextStepBtn" disabled>→ Paso</button>
+    <button class="btn btn-red"    onclick="stopScriptAnim()" id="stopScriptBtn" style="display:none">⏹ Stop</button>
+  </div>
+</div>
+
+<script>
+  /* ── State ── */
+  let A = [], B = [], A0 = [];
+  let N = 5, moves = 0, hist = [];
+  // Script runner (declarados aquí para evitar TDZ cuando initStacks llama stopScriptAnim)
+  let scriptSeq = [], scriptStep = 0, scriptAnimRunning = false, scriptAnimCancel = false;
+
+  /* ── Init ── */
+  function syncN(v, fromInput) {
+    v = Math.max(2, Math.min(500, v || 2));
+    N = v;
+    document.getElementById('nInput').value = v;
+    document.getElementById('slider').value  = Math.min(v, 100);
+    if (fromInput) initStacks();
+  }
+
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.random() * (i + 1) | 0;
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  function initStacks() {
+    if (typeof stopAnim === 'function') stopAnim();
+    if (typeof stopScriptAnim === 'function') stopScriptAnim();
+    N = +document.getElementById('nInput').value || 5;
+    let arr = Array.from({length: N}, (_, i) => i + 1);
+    shuffle(arr);
+    // avoid accidental already-sorted (rare but possible)
+    while (isAscending(arr)) shuffle(arr);
+    A = arr; A0 = [...arr]; B = [];
+    moves = 0; hist = [];
+    render();
+  }
+
+  function resetToOrig() {
+    if (typeof stopAnim === 'function') stopAnim();
+    if (typeof stopScriptAnim === 'function') stopScriptAnim();
+    A = [...A0]; B = [];
+    moves = 0; hist = [];
+    render();
+  }
+
+  function clearHist() {
+    hist = [];
+    renderHist();
+  }
+
+  /* ── Sort check ── */
+  function isAscending(arr) {
+    for (let i = 0; i < arr.length - 1; i++) if (arr[i] > arr[i+1]) return false;
+    return true;
+  }
+  function isSorted() { return B.length === 0 && isAscending(A); }
+
+  /* ── Color ── */
+  function hsl(v) {
+    // value 1 → red (0°), value N → blue (240°)
+    const ratio = (v - 1) / Math.max(N - 1, 1);
+    return `hsl(${Math.round(ratio * 240)},65%,55%)`;
+  }
+
+  /* ── Render ── */
+  function renderStack(listId, titleId, stack, label) {
+    const list  = document.getElementById(listId);
+    const title = document.getElementById(titleId);
+    const sorted = (listId === 'listA') && isSorted();
+    const empty  = stack.length === 0;
+
+    title.textContent = `${label} [${stack.length}]`;
+    title.className   = 'stack-title ' + (empty ? 's-empty' : sorted ? 's-sorted' : 's-unsorted');
+
+    list.innerHTML = '';
+
+    if (empty) {
+      list.innerHTML = '<div class="stack-empty-msg">vacío</div>';
+      return;
+    }
+
+    const bigMode = N <= 25;
+    // For bar mode: max width of bars in px (container ~340px, label takes 36)
+    const BAR_MAX = 200;
+
+    stack.forEach((v, i) => {
+      const el = document.createElement('div');
+      const c  = hsl(v);
+      const isTop = i === 0;
+
+      if (bigMode) {
+        el.className = 'item-big' + (isTop ? ' is-top' : '');
+        el.style.background = c;
+        el.style.color = '#000';
+        el.style.fontSize = N <= 8 ? '1rem' : N <= 15 ? '0.85rem' : '0.75rem';
+        el.style.height = N <= 8 ? '36px' : N <= 15 ? '30px' : '24px';
+        el.textContent = v;
+      } else {
+        el.className = 'item-bar' + (isTop ? ' is-top' : '');
+        const w = Math.max(3, Math.round((v / N) * BAR_MAX));
+        el.innerHTML =
+          `<span class="lbl">${v}</span>` +
+          `<div class="bar" style="width:${w}px;background:${c}"></div>`;
+      }
+      list.appendChild(el);
+    });
+  }
+
+  function renderHist() {
+    const box = document.getElementById('histBox');
+    if (!hist.length) { box.innerHTML = '—'; return; }
+    box.innerHTML = hist.map(m => `<span class="chip chip-${m}">${m}</span>`).join('');
+    box.scrollTop = box.scrollHeight;
+  }
+
+  function render() {
+    renderStack('listA', 'titleA', A, 'Stack A');
+    renderStack('listB', 'titleB', B, 'Stack B');
+
+    document.getElementById('cNum').textContent = moves;
+
+    const pill = document.getElementById('pill');
+    const sorted = isSorted();
+    pill.className = 'status-pill ' + (sorted ? 'pill-yes' : 'pill-no');
+    pill.textContent = sorted ? '✅ ¡Ordenado!' : 'no ordenado';
+    if (sorted) { pill.classList.add('pop'); setTimeout(() => pill.classList.remove('pop'), 400); }
+
+    renderHist();
+  }
+
+  function addMove(op) {
+    moves++;
+    hist.push(op);
+    render();
+  }
+
+  function copySeq() {
+    if (!hist.length) return;
+    navigator.clipboard.writeText(hist.join('\n')).then(() => {
+      const b = document.querySelector('button[onclick="copySeq()"]');
+      const t = b.textContent;
+      b.textContent = '✅ ¡Copiado!';
+      setTimeout(() => b.textContent = t, 1500);
+    });
+  }
+
+  /* ── Operations ── */
+  function do_sa()  { if (A.length>=2){ [A[0],A[1]]=[A[1],A[0]]; addMove('sa'); } }
+  function do_sb()  { if (B.length>=2){ [B[0],B[1]]=[B[1],B[0]]; addMove('sb'); } }
+  function do_ss()  {
+    let ok=false;
+    if(A.length>=2){[A[0],A[1]]=[A[1],A[0]];ok=true;}
+    if(B.length>=2){[B[0],B[1]]=[B[1],B[0]];ok=true;}
+    if(ok) addMove('ss');
+  }
+  function do_pa()  { if(B.length){A.unshift(B.shift()); addMove('pa');} }
+  function do_pb()  { if(A.length){B.unshift(A.shift()); addMove('pb');} }
+  function do_ra()  { if(A.length>1){A.push(A.shift()); addMove('ra');} }
+  function do_rb()  { if(B.length>1){B.push(B.shift()); addMove('rb');} }
+  function do_rr()  {
+    let ok=false;
+    if(A.length>1){A.push(A.shift());ok=true;}
+    if(B.length>1){B.push(B.shift());ok=true;}
+    if(ok) addMove('rr');
+  }
+  function do_rra() { if(A.length>1){A.unshift(A.pop()); addMove('rra');} }
+  function do_rrb() { if(B.length>1){B.unshift(B.pop()); addMove('rrb');} }
+  function do_rrr() {
+    let ok=false;
+    if(A.length>1){A.unshift(A.pop());ok=true;}
+    if(B.length>1){B.unshift(B.pop());ok=true;}
+    if(ok) addMove('rrr');
+  }
+
+  /* ── Keyboard shortcuts ── */
+  const KEYS = {
+    a:'do_sa', b:'do_sb', s:'do_ss',
+    p:'do_pa', o:'do_pb',
+    r:'do_ra', e:'do_rb', t:'do_rr',
+    f:'do_rra', d:'do_rrb', g:'do_rrr',
+  };
+  document.addEventListener('keydown', ev => {
+    if (ev.target.tagName === 'INPUT' || ev.target.tagName === 'TEXTAREA') return;
+    const fn = KEYS[ev.key.toLowerCase()];
+    if (fn) { ev.preventDefault(); window[fn](); }
+  });
+
+  /* ── Macros ── */
+  const VALID_OPS = new Set(['sa','sb','ss','pa','pb','ra','rb','rr','rra','rrb','rrr']);
+  let macros = [];
+  let animating = false;
+  let animCancel = false;
+  let animIdx = -1;  // card currently animating
+
+  function loadMacros() {
+    try { macros = JSON.parse(localStorage.getItem('ps_macros') || '[]'); } catch(_) {}
+    if (!macros.length) macros = [
+      { name: 'Algoritmo 1', seq: '' },
+      { name: 'Algoritmo 2', seq: '' },
+    ];
+    renderMacros();
+  }
+
+  function saveMacros() {
+    macros = Array.from(document.querySelectorAll('.macro-card')).map(c => ({
+      name: c.querySelector('.macro-name').value,
+      seq:  c.querySelector('.macro-seq').value,
+    }));
+    localStorage.setItem('ps_macros', JSON.stringify(macros));
+  }
+
+  function addMacro() {
+    saveMacros();
+    macros.push({ name: `Algoritmo ${macros.length + 1}`, seq: '' });
+    renderMacros();
+  }
+
+  function deleteMacro(i) {
+    saveMacros();
+    macros.splice(i, 1);
+    renderMacros();
+  }
+
+  function parseSeq(txt) {
+    return txt.trim().split(/[\s,\n\r]+/).filter(s => s.length > 0);
+  }
+
+  function seqStats(txt) {
+    const tokens = parseSeq(txt);
+    const bad = tokens.filter(t => !VALID_OPS.has(t));
+    return { total: tokens.length, bad };
+  }
+
+  function infoHtml(txt) {
+    const { total, bad } = seqStats(txt);
+    if (!total) return '<span style="color:#444d56">vacío — escribe ops separadas por espacios o saltos</span>';
+    const ok = total - bad.length;
+    let s = `<span style="color:#3fb950">${ok} op${ok!==1?'s':''}</span>`;
+    if (bad.length) {
+      const preview = bad.slice(0, 4).join(', ') + (bad.length > 4 ? '…' : '');
+      s += ` · <span class="err">${bad.length} inválida${bad.length!==1?'s':''}: ${preview}</span>`;
+    }
+    return s;
+  }
+
+  function renderMacros() {
+    const grid = document.getElementById('macrosGrid');
+    grid.innerHTML = '';
+    macros.forEach((m, i) => {
+      const card = document.createElement('div');
+      card.className = 'macro-card' + (animIdx === i ? ' is-animating' : '');
+      card.id = `mc-${i}`;
+
+      // name row
+      const hdr = document.createElement('div');
+      hdr.className = 'macro-hdr';
+      const nameEl = document.createElement('input');
+      nameEl.className = 'macro-name';
+      nameEl.type = 'text';
+      nameEl.value = m.name;
+      nameEl.placeholder = 'Nombre del algoritmo';
+      nameEl.addEventListener('change', saveMacros);
+      const delBtn = document.createElement('button');
+      delBtn.className = 'macro-del';
+      delBtn.textContent = '✕';
+      delBtn.title = 'Eliminar macro';
+      delBtn.onclick = () => deleteMacro(i);
+      hdr.append(nameEl, delBtn);
+
+      // textarea
+      const ta = document.createElement('textarea');
+      ta.className = 'macro-seq';
+      ta.rows = 4;
+      ta.placeholder = 'Secuencia de operaciones:\npb ra rra pa\nsa pb ra pa ...';
+      ta.value = m.seq;
+      ta.addEventListener('input',  () => { updateInfo(i); });
+      ta.addEventListener('change', saveMacros);
+
+      // info line
+      const info = document.createElement('div');
+      info.className = 'macro-info';
+      info.id = `mi-${i}`;
+      info.innerHTML = infoHtml(m.seq);
+
+      // progress line (shown during animation)
+      const prog = document.createElement('div');
+      prog.className = 'macro-progress';
+      prog.id = `mp-${i}`;
+
+      // action buttons
+      const acts = document.createElement('div');
+      acts.className = 'macro-acts';
+      const runBtn = document.createElement('button');
+      runBtn.className = 'btn btn-green';
+      runBtn.textContent = '▶ Ejecutar';
+      runBtn.disabled = animating;
+      runBtn.onclick = () => execMacro(i);
+      const animBtn = document.createElement('button');
+      animBtn.className = 'btn btn-gray';
+      animBtn.textContent = '⏯ Animar';
+      animBtn.disabled = animating;
+      animBtn.id = `mb-${i}`;
+      animBtn.onclick = () => animateMacro(i);
+      acts.append(runBtn, animBtn);
+
+      card.append(hdr, ta, info, prog, acts);
+      grid.appendChild(card);
+    });
+  }
+
+  function updateInfo(i) {
+    const card = document.getElementById(`mc-${i}`);
+    if (!card) return;
+    const el = document.getElementById(`mi-${i}`);
+    if (el) el.innerHTML = infoHtml(card.querySelector('.macro-seq').value);
+  }
+
+  function execMacro(i) {
+    if (animating) return;
+    saveMacros();
+    parseSeq(macros[i].seq).forEach(op => { if (VALID_OPS.has(op)) window[`do_${op}`](); });
+  }
+
+  async function animateMacro(i) {
+    if (animating) return;
+    saveMacros();
+    const seq = parseSeq(macros[i].seq).filter(op => VALID_OPS.has(op));
+    if (!seq.length) return;
+
+    animating = true;
+    animCancel = false;
+    animIdx = i;
+    document.getElementById('stopBtn').style.display = '';
+    renderMacros();
+
+    const progEl = document.getElementById(`mp-${i}`);
+    for (let step = 0; step < seq.length; step++) {
+      if (animCancel) break;
+      const op = seq[step];
+      window[`do_${op}`]();
+      if (progEl) progEl.textContent = `[${step + 1}/${seq.length}] ${op}`;
+      await new Promise(r => setTimeout(r, +document.getElementById('animSpeed').value || 250));
+    }
+
+    if (progEl) progEl.textContent = animCancel ? '⏹ detenido' : '✅ completo';
+    animating = false;
+    animIdx = -1;
+    document.getElementById('stopBtn').style.display = 'none';
+    renderMacros();
+  }
+
+  function stopAnim() {
+    animCancel = true;
+  }
+
+  /* ── Script runner ── */
+  const EXAMPLES = {
+    sort3: `// Ordenar exactamente 3 elementos (máx. 3 movimientos)
+// Cubre los 6 casos posibles
+if      (A[0]>A[1] && A[1]>A[2])               { sa(); rra(); } // 3 2 1
+else if (A[0]>A[1] && A[0]>A[2])               { ra();        } // 3 1 2
+else if (A[0]>A[1])                             { sa();        } // 2 1 3
+else if (A[1]>A[2] && A[0]>A[2])               { rra();       } // 2 3 1
+else if (A[1]>A[2])                             { rra(); sa(); } // 1 3 2
+// 1 2 3 → ya ordenado`,
+
+    selSort: `// Selection sort via B — O(n²), siempre correcto
+// Fase 1: mover todo A a B
+while (A.length > 0) pb();
+
+// Fase 2: sacar de B de mayor a menor hacia A
+// (el mayor de B siempre llega al top antes del pa)
+while (B.length > 0) {
+  let maxIdx = 0;
+  for (let i = 1; i < B.length; i++)
+    if (B[i] > B[maxIdx]) maxIdx = i;
+
+  // Rotar B por el camino más corto hasta poner el máximo arriba
+  if (maxIdx <= Math.floor(B.length / 2)) {
+    for (let i = 0; i < maxIdx; i++) rb();
+  } else {
+    for (let i = 0; i < B.length - maxIdx; i++) rrb();
+  }
+  pa();
+}`,
+
+    insSort: `// Insertion sort via B
+// B se mantiene ordenado descendente (mayor arriba)
+// Al final pa() de B a A da A ascendente
+
+while (A.length > 0) {
+  const val = A[0];
+  // Cuántos elementos del top de B son mayores que val
+  let rot = 0;
+  while (rot < B.length && B[rot] > val) rot++;
+
+  // Rotar B esas posiciones (camino más corto si quieres optimizar)
+  for (let i = 0; i < rot; i++) rb();
+  pb(); // val queda justo encima de los menores
+  // Restaurar B a posición original
+  for (let i = 0; i < rot; i++) rrb();
+}
+// B ordenado desc → pa() da A ordenado asc
+while (B.length > 0) pa();`,
+
+    bubble: `// ── Bubble sort adaptado a push_swap ────────────────────────────────
+// Complejidad: O(n²) — solo útil para n ≤ ~50 o para entender el flujo
+//
+// Problema: en push_swap solo vemos A[0] y A[1], no posiciones arbitrarias.
+// Solución: usamos ra() para "deslizarnos" por todos los pares adyacentes.
+//
+// ¿Por qué el máximo llega al top tras n-1 ra's?
+//   En cada comparación, si A[0] > A[1] → sa() (el mayor sube).
+//   Después de n-1 comparaciones circulares, el máximo ha "ganado"
+//   todas las comparaciones en las que participó → queda en A[0].
+//
+// ¿Por qué n-1 rra's dejan el máximo al fondo?
+//   Las n-1 rra's deshacen las n-1 rotaciones del loop.
+//   Pero como el array cambió por los sa's, el resultado NO es el original:
+//   el máximo, que estaba en A[0], acaba desplazado a A[n-1] (fondo). ✓
+//
+// Optimización: si en una pasada no hubo ningún sa() → ya está ordenado.
+
+let n = A.length;
+
+while (n > 1) {
+  let swapped = false;
+
+  // ── Pasada: comparar n-1 pares adyacentes (circular) ──
+  for (let i = 0; i < n - 1; i++) {
+    if (A[0] > A[1]) { sa(); swapped = true; }
+    ra(); // avanzar al siguiente par
+  }
+  // Aquí: A ha rotado n-1 posiciones y el máximo está en A[0].
+
+  // ── Deshacer rotaciones: el máximo queda en A[n-1] (fondo) ──
+  for (let i = 0; i < n - 1; i++) rra();
+
+  if (!swapped) break; // sin intercambios → ordenado
+  n--;
+}`,
+
+    radix: `// ── Radix sort LSD (Least Significant Bit first) ──────────────────
+// Complejidad: O(n · ⌈log₂ n⌉) movimientos  → muy bueno para n grande
+//
+// Idea: ordenar de bit en bit, del menos al más significativo.
+// En cada pasada leemos 1 bit de cada elemento:
+//   bit = 0  →  pb()  (va a B, "partición baja")
+//   bit = 1  →  ra()  (se queda en A, rota al fondo)
+// Al final de cada pasada: vaciamos B a A con pa().
+//
+// Después de k pasadas (k = ⌈log₂ N⌉), A queda ordenado.
+// Los valores en el trainer son 1..N, los 0-indexamos con (A[0]-1)
+// para que el bit check sea correcto.
+
+const bits = Math.ceil(Math.log2(N)) || 1;
+
+for (let bit = 0; bit < bits; bit++) {
+  // Capturamos el tamaño ANTES: pb cambia A.length durante el loop
+  const size = A.length;
+
+  for (let i = 0; i < size; i++) {
+    if ((A[0] - 1) >> bit & 1) {
+      ra();  // bit = 1 → queda en A, va al fondo
+    } else {
+      pb();  // bit = 0 → pasa a B
+    }
+  }
+
+  // Todos los bit=0 están en B (arriba los últimos empujados).
+  // Los metemos encima de los bit=1 que quedaron en A.
+  while (B.length > 0) pa();
+
+  // Tras esta pasada: todos los elementos con bit[i]=0
+  // están en A por debajo de los que tenían bit[i]=1.
+}`,
+
+    turk: `// ── Turkish sort (distribución por chunks + inserción greedy) ─────
+//
+// Problema del selection sort: buscar el máximo de B cuesta O(n)
+// rotaciones cuando el max está en el medio.
+//
+// Solución turca: pre-organizar B durante la fase de push
+// para que los valores GRANDES queden arriba de B.
+// Así, en la fase 2, el máximo ya está (casi) en el top → pocas rotaciones.
+//
+// ─ Fase 1: A → B ─────────────────────────────────────────────────────
+//   Dividimos [1..N] en numChunks rangos.
+//   Procesamos chunks de MENOR a MAYOR (pequeños primero a B).
+//   Dentro de cada chunk: si el valor está en la MITAD SUPERIOR → rb()
+//   Esto hunde los valores grandes del chunk al fondo de B,
+//   los del siguiente chunk (más grandes) quedarán encima.
+//   Resultado: B[top] ≈ valores grandes, B[bottom] ≈ valores pequeños.
+//
+// ─ Fase 2: B → A ─────────────────────────────────────────────────────
+//   Siempre sacamos el MÁXIMO de B con pa().
+//   A crece: primero el más grande (queda abajo), último el más pequeño.
+//   → A acaba ordenado ascendente (el menor arriba). ✓
+
+const numChunks = Math.max(2, Math.ceil(Math.sqrt(N)));
+const chunkSize  = Math.ceil(N / numChunks);
+
+// ── Fase 1 ──────────────────────────────────────────────────────────
+for (let chunk = 0; chunk < numChunks; chunk++) {
+  const lo    = chunk * chunkSize + 1;
+  const hi    = Math.min((chunk + 1) * chunkSize, N);
+  const count = hi - lo + 1;
+  let pushed  = 0;
+
+  while (pushed < count && A.length > 0) {
+    if (A[0] >= lo && A[0] <= hi) {
+      pb();
+      // Valor de la mitad superior del chunk → rb: lo hundimos en B.
+      // Los chunks futuros (más grandes) se empujarán encima.
+      if (B[0] > Math.floor((lo + hi) / 2)) rb();
+      pushed++;
+    } else {
+      ra(); // no es de este chunk, rotar al fondo de A
+    }
+  }
+}
+
+// ── Fase 2 ──────────────────────────────────────────────────────────
+while (B.length > 0) {
+  // Encontrar el índice del máximo en B
+  let maxIdx = 0;
+  for (let i = 1; i < B.length; i++)
+    if (B[i] > B[maxIdx]) maxIdx = i;
+
+  // Llevar el máximo al top por el camino más corto
+  // (gracias a la fase 1, maxIdx suele ser pequeño → pocos rb)
+  if (maxIdx <= Math.floor(B.length / 2)) {
+    for (let i = 0; i < maxIdx; i++) rb();
+  } else {
+    for (let i = 0; i < B.length - maxIdx; i++) rrb();
+  }
+  pa(); // el mayor de B pasa a A[0], luego descenderá al ser superado
+}`,
+
+    tpl: `// Plantilla — escribe tu algoritmo aquí
+// Lee el estado con A[i], B[i], A.length, B.length, N
+// Llama a las ops como funciones: sa(), pb(), ra(), etc.
+
+// Fase 1: mover elementos de A a B con lógica propia
+while (A.length > 3) {
+  // decide qué hacer según el estado actual
+  pb();
+}
+
+// Fase 2: ordenar los ≤3 que quedan en A
+// (ver ejemplo "sort3" para el código)
+
+// Fase 3: reinsertar B en A en el orden correcto
+while (B.length > 0) {
+  pa();
+}`,
+  };
+
+  function loadExample(val) {
+    if (!val) return;
+    document.getElementById('scriptCode').value = EXAMPLES[val] || '';
+    setScriptMsg('', '');
+  }
+
+  // Ejecuta una op contra arrays temporales (modo compilación)
+  function applyOp(name, a, b) {
+    switch (name) {
+      case 'sa':  if(a.length>=2){[a[0],a[1]]=[a[1],a[0]];} break;
+      case 'sb':  if(b.length>=2){[b[0],b[1]]=[b[1],b[0]];} break;
+      case 'ss':  if(a.length>=2){[a[0],a[1]]=[a[1],a[0]];} if(b.length>=2){[b[0],b[1]]=[b[1],b[0]];} break;
+      case 'pa':  if(b.length){a.unshift(b.shift());} break;
+      case 'pb':  if(a.length){b.unshift(a.shift());} break;
+      case 'ra':  if(a.length>1){a.push(a.shift());} break;
+      case 'rb':  if(b.length>1){b.push(b.shift());} break;
+      case 'rr':  if(a.length>1){a.push(a.shift());} if(b.length>1){b.push(b.shift());} break;
+      case 'rra': if(a.length>1){a.unshift(a.pop());} break;
+      case 'rrb': if(b.length>1){b.unshift(b.pop());} break;
+      case 'rrr': if(a.length>1){a.unshift(a.pop());} if(b.length>1){b.unshift(b.pop());} break;
+    }
+  }
+
+  // Compila el script contra copias de fromA/fromB y devuelve la secuencia grabada
+  function compileScript(fromA, fromB) {
+    const code = document.getElementById('scriptCode').value.trim();
+    if (!code) { setScriptMsg('Escribe un algoritmo primero', 'err'); return null; }
+
+    const tA = [...fromA], tB = [...fromB];
+    const recorded = [];
+    let opCount = 0;
+    const MAX_OPS = 50000;
+    const OPS = ['sa','sb','ss','pa','pb','ra','rb','rr','rra','rrb','rrr'];
+
+    const wrappers = OPS.map(op => () => {
+      if (++opCount > MAX_OPS) throw new Error(`Límite de ${MAX_OPS} operaciones alcanzado — ¿bucle infinito?`);
+      applyOp(op, tA, tB);
+      recorded.push(op);
+    });
+
+    try {
+      new Function('A','B','N',...OPS, code)(tA, tB, N, ...wrappers);
+      return recorded;
+    } catch(e) {
+      setScriptMsg('❌ ' + e.message, 'err');
+      return null;
+    }
+  }
+
+  function setScriptMsg(text, type) {
+    const el = document.getElementById('scriptMsg');
+    el.textContent = text;
+    el.className = 'script-msg' + (type ? ' ' + type : '');
+  }
+
+  // Ejecutar instantáneo contra A/B reales
+  // batchRender=true suprime los renders intermedios (mucho más rápido para N grande)
+  function execScript(batchRender = true) {
+    if (scriptAnimRunning) return;
+    const code = document.getElementById('scriptCode').value.trim();
+    if (!code) { setScriptMsg('Escribe un algoritmo primero', 'err'); return; }
+
+    const OPS = ['sa','sb','ss','pa','pb','ra','rb','rr','rra','rrb','rrr'];
+    let opCount = 0;
+    const MAX_OPS = 50000;
+
+    // En modo batch: las ops solo actualizan A/B e hist, sin render DOM
+    const wrappers = OPS.map(op => () => {
+      if (++opCount > MAX_OPS) throw new Error(`Límite de ${MAX_OPS} ops — ¿bucle infinito?`);
+      if (batchRender) {
+        // Aplicar la op directamente sin render
+        applyOp(op, A, B);
+        moves++; hist.push(op);
+      } else {
+        window[`do_${op}`]();
+      }
+    });
+
+    try {
+      new Function('A','B','N',...OPS, code)(A, B, N, ...wrappers);
+      render(); // un solo render al final
+      const ok = isSorted();
+      setScriptMsg((ok ? '✅ ¡Ordenado!' : '⚠ Sin ordenar') + ` — ${moves} movimientos`, ok ? 'ok' : 'inf');
+    } catch(e) {
+      render();
+      setScriptMsg('❌ ' + e.message, 'err');
+    }
+  }
+
+  function initStepMode() {
+    if (scriptAnimRunning) return;
+    const seq = compileScript([...A0], []);
+    if (!seq) return;
+
+    A = [...A0]; B = []; moves = 0; hist = [];
+    render();
+
+    scriptSeq = seq;
+    scriptStep = 0;
+    document.getElementById('nextStepBtn').disabled = false;
+    setScriptMsg(`⏸ Listo — ${seq.length} pasos · pulsa "→ Paso" para avanzar`, 'inf');
+  }
+
+  function nextStep() {
+    if (scriptStep >= scriptSeq.length) return;
+    const op = scriptSeq[scriptStep++];
+    window[`do_${op}`]();
+
+    if (scriptStep >= scriptSeq.length) {
+      document.getElementById('nextStepBtn').disabled = true;
+      const ok = isSorted();
+      setScriptMsg((ok ? '✅ ¡Completado y ordenado!' : '⚠ Completado sin ordenar') + ` — ${scriptSeq.length} ops`, ok ? 'ok' : 'inf');
+    } else {
+      const next = scriptSeq[scriptStep];
+      setScriptMsg(`⏸ Paso ${scriptStep}/${scriptSeq.length} · siguiente: ${next}`, 'inf');
+    }
+  }
+
+  async function animateScript() {
+    if (scriptAnimRunning) return;
+    const seq = compileScript([...A0], []);
+    if (!seq) return;
+
+    A = [...A0]; B = []; moves = 0; hist = [];
+    render();
+
+    scriptSeq = seq;
+    scriptStep = 0;
+    scriptAnimRunning = true;
+    scriptAnimCancel = false;
+    document.getElementById('stopScriptBtn').style.display = '';
+    document.getElementById('nextStepBtn').disabled = true;
+
+    const delay = () => +document.getElementById('animSpeed').value || 250;
+
+    for (let i = 0; i < seq.length; i++) {
+      if (scriptAnimCancel) break;
+      window[`do_${seq[i]}`]();
+      scriptStep = i + 1;
+      setScriptMsg(`▶ [${i+1}/${seq.length}] ${seq[i]}`, 'inf');
+      await new Promise(r => setTimeout(r, delay()));
+    }
+
+    scriptAnimRunning = false;
+    document.getElementById('stopScriptBtn').style.display = 'none';
+    if (!scriptAnimCancel) {
+      const ok = isSorted();
+      setScriptMsg((ok ? '✅ ¡Ordenado!' : '⚠ Sin ordenar') + ` — ${seq.length} ops`, ok ? 'ok' : 'inf');
+    } else {
+      setScriptMsg(`⏹ Detenido en paso ${scriptStep}/${seq.length}`, 'inf');
+    }
+  }
+
+  function stopScriptAnim() { scriptAnimCancel = true; }
+
+  /* ── Boot ── */
+  initStacks();
+  loadMacros();
+</script>
+</body>
+</html>
